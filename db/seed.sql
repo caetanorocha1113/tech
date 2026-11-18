@@ -601,3 +601,7 @@ insert into feed (sponsor_scope, message, created_at) values
 ('litoralpay', 'Lucas M. (SESI Florianópolis) entregou “Troco do Bem”.', now() - interval '60 minutes'),
 ('blusoft', 'O desafio “Chatbot do suporte” passou de 2 mil jovens.', now() - interval '40 minutes'),
 ('*', 'Três projetos avaliados pela banca aguardam a curadoria do quadro.', now() - interval '20 minutes');
+
+-- Projeto esperando a banca técnica (aparece na aba Avaliar do Programa)
+insert into projects (id, owner_name, school_id, city, mission_id, title, description, link, status) values
+('p7', 'Júlia Schmitt', 9, 'São Francisco do Sul', 'm7', 'Sol na Conta', 'Calculadora que compara a conta de luz antes e depois de instalar placas solares, com dados de cidades catarinenses.', 'https://exemplo.dev/sol-na-conta', 'avaliacao');

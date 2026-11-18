@@ -1,11 +1,12 @@
 // POST /api/projects
-//   { action: 'submit', studentId, missionId, title, description, link }  -> entrega + nota da banca + certificado
+//   { action: 'submit', studentId, missionId, title, description, link }  -> entrega (vai para a banca) + certificado
+//   { action: 'grade', id, scores }                                       -> banca técnica dá as notas (às cegas)
 //   { action: 'review', id, approved }                                    -> equipe do programa decide se vai ao ar
 //   { action: 'sponsor', id, sponsorId }                                  -> empresa apadrinha (limite do plano)
 //   { action: 'invite', id, sponsorId }                                   -> empresa convida para conversa
 import { getSql } from './_lib/db.js';
 import { route, body, text, id, fail } from './_lib/http.js';
-import { PLAN, XP, pub, genScores, total, newId } from './_lib/rules.js';
+import { PLAN, CRIT, XP, pub, total, newId } from './_lib/rules.js';
 
 export default route(['POST'], async req => {
   const sql = getSql();
@@ -28,13 +29,11 @@ export default route(['POST'], async req => {
     if (!ctx) fail(400, 'Entre no desafio antes de enviar o projeto.');
     if (ctx.status === 'delivered') fail(409, 'Você já entregou este desafio.');
 
-    const scores = genScores(), score = total(scores);
     const pid = newId('p'), cid = newId('c');
     const skillGain = Math.round(ctx.points / 12);
     await sql.transaction([
-      sql`insert into projects (id, student_id, owner_name, school_id, city, mission_id, title, description, link, scores, score)
-          values (${pid}, ${studentId}, ${ctx.name}, ${ctx.school_id}, ${ctx.city}, ${missionId}, ${title}, ${description}, ${link},
-                  ${JSON.stringify(scores)}::jsonb, ${score})`,
+      sql`insert into projects (id, student_id, owner_name, school_id, city, mission_id, title, description, link)
+          values (${pid}, ${studentId}, ${ctx.name}, ${ctx.school_id}, ${ctx.city}, ${missionId}, ${title}, ${description}, ${link})`,
       sql`insert into certificates (id, student_id, owner_name, school_id, city, title, area)
           values (${cid}, ${studentId}, ${ctx.name}, ${ctx.school_id}, ${ctx.city}, ${`${ctx.area} aplicado: ${ctx.mtitle}`}, ${ctx.area})`,
       sql`update participations set status = 'delivered' where student_id = ${studentId} and mission_id = ${missionId}`,
@@ -43,11 +42,29 @@ export default route(['POST'], async req => {
             skills = jsonb_set(skills, ${'{' + ctx.area + '}'}::text[],
                                to_jsonb(least(100, coalesce((skills ->> ${ctx.area})::int, 0) + ${skillGain})))
           where id = ${studentId}`,
-      sql`insert into feed (sponsor_scope, message) values
-          (${ctx.sponsor_id}, ${`${pub(ctx.name)} entregou “${title}” no desafio “${ctx.mtitle}”.`}),
-          ('*', ${`A banca técnica avaliou “${title}”: nota ${score}. Projeto na fila do quadro.`})`
+      sql`insert into feed (sponsor_scope, message)
+          values (${ctx.sponsor_id}, ${`${pub(ctx.name)} entregou “${title}” no desafio “${ctx.mtitle}”.`})`
     ]);
-    return { id: pid, certId: cid, scores, score, awarded: ctx.points };
+    return { id: pid, certId: cid, awarded: ctx.points };
+  }
+
+  if (b.action === 'grade') {
+    const pid = id(b.id, 'projeto');
+    const given = b.scores && typeof b.scores === 'object' ? b.scores : {};
+    const scores = {};
+    for (const [k] of CRIT) {
+      const v = Number(given[k]);
+      if (!Number.isInteger(v) || v < 0 || v > 100) fail(400, 'Dê uma nota de 0 a 100 para cada critério.');
+      scores[k] = v;
+    }
+    const score = total(scores);
+    const rows = await sql`update projects set scores = ${JSON.stringify(scores)}::jsonb, score = ${score},
+                             status = 'pendente', graded_at = now()
+                           where id = ${pid} and status = 'avaliacao' returning title`;
+    if (!rows.length) fail(409, 'Este projeto já foi avaliado.');
+    await sql`insert into feed (message)
+              values (${`A banca técnica avaliou “${rows[0].title}”: nota ${score}. Projeto na fila do quadro.`})`;
+    return { score };
   }
 
   if (b.action === 'review') {
@@ -79,8 +96,13 @@ export default route(['POST'], async req => {
     const [{ n }] = await sql`select count(*)::int as n from projects where sponsor_id = ${sponsorId}`;
     if (n >= allowed) fail(409, allowed ? 'Seu plano não inclui mais apadrinhamentos.' : 'Lance um desafio para poder apadrinhar projetos.');
     const rows = await sql`update projects set sponsor_id = ${sponsorId}
-                           where id = ${pid} and sponsor_id is null and status <> 'recusado' returning title`;
-    if (!rows.length) fail(409, 'Este projeto já tem padrinho.');
+                           where id = ${pid} and sponsor_id is null and status in ('pendente', 'aprovado') returning title`;
+    if (!rows.length) {
+      const [p] = await sql`select status, sponsor_id from projects where id = ${pid}`;
+      if (!p) fail(404, 'Projeto não encontrado.');
+      if (p.sponsor_id) fail(409, 'Este projeto já tem padrinho.');
+      fail(409, 'Só dá para apadrinhar projetos já avaliados pela banca.');
+    }
     await sql`insert into feed (message) values (${`${sp.name} apadrinhou “${rows[0].title}”.`})`;
     return { ok: true };
   }

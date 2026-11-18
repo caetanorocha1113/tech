@@ -30,12 +30,7 @@ export const pub = n => {
   return p.length > 1 ? `${p[0]} ${p[p.length - 1][0]}.` : p[0];
 };
 
-// Simula a nota da banca técnica (no produto real, a nota vem dos avaliadores)
-export function genScores() {
-  const target = 84 + Math.random() * 8, o = {};
-  for (const [k] of CRIT) o[k] = Math.max(40, Math.min(100, Math.round(target + (Math.random() - 0.5) * 18)));
-  return o;
-}
+// Nota final = média ponderada dos critérios da banca
 export const total = sc => Math.round(CRIT.reduce((a, [k, w]) => a + sc[k] * w, 0) / 100);
 
 export const newId = prefix => prefix + '_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);

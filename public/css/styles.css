@@ -439,3 +439,13 @@ td{padding:11px 10px;border-top:1px solid var(--line);font-variant-numeric:tabul
 .dbst{display:inline-flex;align-items:center;gap:7px;font-size:12.5px}
 .dbst::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--amberFill);flex:none}
 .dbst.on::before{background:var(--mint)}
+
+/* chegada pelo QR da TV */
+.qr-arrive{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--coralSoft);border-radius:16px;padding:14px 16px;margin-bottom:20px;font-size:15px}
+
+/* banca técnica */
+.grade-card form{gap:18px}
+.gr{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.gr-top{display:flex;align-items:baseline;gap:8px}
+.gr-top output{margin-left:auto;font-stretch:118%;font-weight:800;font-size:18px;font-variant-numeric:tabular-nums;min-width:3ch;text-align:right}
+.gr input[type=range]{width:100%;accent-color:var(--acc);height:28px;margin:0}

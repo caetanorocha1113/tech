@@ -1,0 +1,86 @@
+/* Telão Tech SC Jovem: tela 16:9 que se ajusta a qualquer projetor.
+   Todas as medidas usam cqw (porcentagem da largura da tela). */
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#05070F;color:#fff;font-family:'Archivo',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+body{display:grid;place-items:center}
+h1,h2,p{margin:0}
+
+.stage{position:relative;width:min(100vw,177.78vh);aspect-ratio:16/9;overflow:hidden;isolation:isolate;container-type:inline-size;
+  background:linear-gradient(160deg,#141C33,#0B101E);
+  display:grid;grid-template-columns:1.15fr .62fr .78fr;grid-template-rows:auto 1fr auto;
+  gap:2cqw;padding:2.4cqw 2.8cqw 0}
+.glow{position:absolute;border-radius:50%;filter:blur(4cqw);z-index:-1}
+.g1{width:60%;height:85%;right:-10%;top:-25%;background:rgba(40,78,230,.55);animation:drift1 14s ease-in-out infinite alternate}
+.g2{width:50%;height:70%;left:-12%;bottom:-25%;background:rgba(210,53,59,.42);animation:drift2 16s ease-in-out infinite alternate}
+.grid-lines{position:absolute;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:4cqw 4cqw;-webkit-mask-image:linear-gradient(180deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(180deg,transparent,#000 20%,#000 80%,transparent)}
+
+.bar{grid-column:1/-1;display:flex;align-items:center;gap:1.2cqw;font-size:1.5cqw}
+.bar b{font-stretch:118%}
+.spacer{flex:1}
+.live{display:inline-flex;align-items:center;gap:.6cqw;background:#D2353B;border-radius:.6cqw;padding:.35cqw 1cqw;font-weight:800;font-size:1.2cqw;letter-spacing:.04em}
+.live::before{content:"";width:.6cqw;height:.6cqw;border-radius:50%;background:#fff;animation:pulse 1.4s infinite}
+.clock{font-variant-numeric:tabular-nums;font-weight:700;color:#C5CCE6}
+
+.call{display:flex;flex-direction:column;gap:1.1cqw;min-width:0;padding-top:1cqw}
+.kicker{font-size:1.35cqw;font-weight:700;color:#FF8A66;letter-spacing:.06em;text-transform:uppercase}
+.call h1{font-stretch:118%;font-weight:800;font-size:4.6cqw;line-height:1;letter-spacing:-.03em}
+.prize{font-size:1.45cqw;color:#C5CCE6;max-width:40ch}
+.prize b{color:#fff}
+.counters{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2cqw;margin-top:1.2cqw}
+.counters div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:1.2cqw;padding:1.2cqw 1.3cqw;display:flex;flex-direction:column;gap:.3cqw}
+.counters b{font-stretch:118%;font-size:3.1cqw;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.counters span{font-size:1.1cqw;color:#AEB8D8}
+.counters b.bump{animation:bump .7s}
+.onair{margin-top:auto;margin-bottom:1.6cqw;display:flex;gap:1.2cqw;align-items:center;background:rgba(255,255,255,.95);color:#111A2E;border-radius:1.2cqw;padding:1cqw 1.4cqw;animation:slide .6s cubic-bezier(.2,.8,.2,1)}
+.onair .tag{background:#D2353B;color:#fff;font-weight:800;font-size:1cqw;padding:.4cqw .8cqw;border-radius:.5cqw;white-space:nowrap}
+.onair b{font-stretch:112%;font-size:1.6cqw;display:block}
+.onair small{font-size:1.05cqw;color:#566180}
+.onair .sc{margin-left:auto;font-stretch:118%;font-weight:800;font-size:2.4cqw;color:#0E6B70}
+
+.qrcard{align-self:center;background:#fff;color:#111A2E;border-radius:1.8cqw;padding:1.4cqw;display:flex;flex-direction:column;align-items:center;gap:.9cqw;text-align:center;box-shadow:0 2cqw 4cqw -1.5cqw rgba(0,0,0,.6);position:relative;overflow:hidden}
+.qrcard .qr{width:100%;aspect-ratio:1;position:relative}
+.qrcard .qr svg{width:100%;height:100%;display:block}
+.qrcard .qr::after{content:"";position:absolute;left:0;right:0;height:16%;top:-20%;background:linear-gradient(180deg,transparent,rgba(255,106,61,.35),transparent);animation:scan 3s ease-in-out infinite}
+.qrcard p{font-size:1.35cqw}
+.qrcard small{font-size:.95cqw;color:#566180;word-break:break-all}
+
+.rank{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:1.6cqw;padding:1.5cqw 1.6cqw;min-width:0;display:flex;flex-direction:column;gap:1cqw;margin-bottom:1.6cqw}
+.rank h2{font-stretch:118%;font-size:1.7cqw;letter-spacing:-.02em}
+.rank ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.45cqw;flex:1}
+.rank li{display:grid;grid-template-columns:2.4cqw 1fr auto;align-items:center;gap:.8cqw;padding:.6cqw .8cqw;border-radius:.8cqw;font-size:1.3cqw;transition:background .4s}
+.rank li .p{font-stretch:118%;font-weight:800;color:#8C96B8;font-variant-numeric:tabular-nums}
+.rank li:nth-child(-n+3) .p{color:#FF8A66}
+.rank li:first-child{background:rgba(255,106,61,.16)}
+.rank li small{display:block;font-size:.95cqw;color:#8C96B8}
+.rank li b{font-variant-numeric:tabular-nums;font-size:1.4cqw}
+.rank li.up{animation:flash 2.2s}
+
+.third{grid-column:1/-1;display:flex;align-items:stretch;margin:0 -2.8cqw;font-size:1.45cqw;font-weight:700}
+.third>b{background:#D2353B;padding:1.2cqw 2.2cqw 1.2cqw 2.8cqw;white-space:nowrap;font-stretch:112%}
+.tk{flex:1;overflow:hidden;background:#F0F1F5;color:#111A2E;display:flex;align-items:center}
+.tk-track{display:flex;gap:4cqw;width:max-content;white-space:nowrap;animation:tick 60s linear infinite;padding-left:2cqw}
+.tk-track span::before{content:"";display:inline-block;width:.6cqw;height:.6cqw;border-radius:.15cqw;background:#D2353B;margin-right:1cqw;vertical-align:.2cqw}
+
+.pop{position:absolute;left:50%;top:7cqw;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:.8cqw;pointer-events:none}
+.pop div{background:#FF6A3D;color:#14262A;font-weight:800;font-size:1.7cqw;padding:1cqw 2cqw;border-radius:1.2cqw;box-shadow:0 1.5cqw 3cqw -1cqw rgba(0,0,0,.6);animation:popIn .5s cubic-bezier(.2,.9,.3,1.3),popOut .4s 4.2s forwards;max-width:60cqw;text-align:center}
+
+.offline{position:absolute;inset:0;z-index:10;background:rgba(5,7,15,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4cqw;text-align:center;padding:4cqw}
+.offline h2{font-stretch:118%;font-size:3cqw}
+.offline p{font-size:1.5cqw;color:#C5CCE6;max-width:50ch}
+.offline a{color:#FF8A66;font-size:1.4cqw;font-weight:700}
+.fs{position:absolute;right:1.4cqw;bottom:5.2cqw;z-index:6;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:.8cqw;padding:.5cqw 1cqw;font:inherit;font-size:1cqw;cursor:pointer;opacity:.6}
+.fs:hover{opacity:1}
+:fullscreen .fs{display:none}
+
+@keyframes drift1{to{transform:translate(-14%,12%) scale(1.1)}}
+@keyframes drift2{to{transform:translate(18%,-10%) scale(1.12)}}
+@keyframes pulse{50%{opacity:.35}}
+@keyframes scan{0%{top:-20%}60%,100%{top:105%}}
+@keyframes tick{to{transform:translateX(-50%)}}
+@keyframes bump{40%{transform:scale(1.12);color:#FF8A66}}
+@keyframes flash{0%,60%{background:rgba(71,211,174,.35)}}
+@keyframes slide{from{transform:translateY(1cqw);opacity:0}}
+@keyframes popIn{from{transform:translateY(-2cqw) scale(.9);opacity:0}}
+@keyframes popOut{to{transform:translateY(-1cqw);opacity:0}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}

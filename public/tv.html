@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telão · Tech SC Jovem ao vivo</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap">
+<link rel="stylesheet" href="css/tv.css">
+</head>
+<body>
+<!-- Telão para projetar: abre em tela cheia (tecla F) e se atualiza sozinho -->
+<div class="stage" id="stage">
+  <span class="glow g1"></span><span class="glow g2"></span><div class="grid-lines"></div>
+
+  <header class="bar">
+    <span class="live">AO VIVO</span><b>NSC TV</b>
+    <span class="spacer"></span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <section class="call">
+    <p class="kicker" id="kicker">Desafio da semana</p>
+    <h1 id="title">Carregando…</h1>
+    <p class="prize" id="prize"></p>
+    <div class="counters">
+      <div><b id="cJoined">0</b><span>jovens no desafio</span></div>
+      <div><b id="cDelivered">0</b><span>projetos entregues</span></div>
+      <div><b id="cAired">0</b><span>projetos no ar</span></div>
+    </div>
+    <div class="onair" id="onair" hidden></div>
+  </section>
+
+  <section class="qrcard">
+    <div class="qr" id="qr"></div>
+    <p><b>Aponte a câmera</b> e entre no desafio agora</p>
+    <small id="qrUrl"></small>
+  </section>
+
+  <aside class="rank">
+    <h2>Ranking ao vivo</h2>
+    <ol id="rank"></ol>
+  </aside>
+
+  <footer class="third">
+    <b>Tech SC Jovem</b>
+    <div class="tk"><div class="tk-track" id="ticker"></div></div>
+  </footer>
+
+  <div class="pop" id="pop" aria-live="polite"></div>
+  <div class="offline" id="offline" hidden>
+    <h2>O telão precisa do banco de dados</h2>
+    <p>Ele mostra o que acontece ao vivo na plataforma. Abra esta página pelo site publicado na Vercel, com o banco conectado.</p>
+    <a href="index.html">Voltar para o site</a>
+  </div>
+  <button class="fs" id="fs" aria-label="Tela cheia">Tela cheia (F)</button>
+</div>
+
+<script src="js/vendor/qrcode.js"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/tv.js"></script>
+</body>
+</html>

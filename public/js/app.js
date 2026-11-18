@@ -39,7 +39,8 @@ function init(){
     P('p3','Vibra ESP32','Simulação de sensor de vibração com alerta por cor.','Gabriel Weber',7,'m3','pendente',null,80),
     P('p4','Porto Rush','Jogo de contêineres com 5 fases e ranking.','Matheus Pires',6,'m4','aprovado','portox',89),
     P('p5','Moda Circular','Vitrine com selo de origem de cada peça.','Isadora Linhares',5,'m5','aprovado',null,84),
-    P('p6','Cozinha Zero','Painel que mostra as 3 maiores perdas da semana.','Pedro Koerich',13,'m6','pendente',null,76)
+    P('p6','Cozinha Zero','Painel que mostra as 3 maiores perdas da semana.','Pedro Koerich',13,'m6','pendente',null,76),
+    {id:'p7',title:'Sol na Conta',desc:'Calculadora que compara a conta de luz antes e depois de instalar placas solares, com dados de cidades catarinenses.',owner:'Júlia Schmitt',school:9,mission:'m7',status:'avaliacao',sp:null,scores:null,score:null,ownerId:'seed',link:'https://exemplo.dev/sol-na-conta'}
   ];
   const C=(id,owner,school,title,area,status,own)=>({id,owner,school,title,area,status,ownerId:own||'seed'});
   const certs=[
@@ -74,17 +75,31 @@ async function refresh(){
   const d=await API.get('/api/bootstrap'+(sid?'?student='+encodeURIComponent(sid):''));
   if(sid&&!d.me)API.studentId='';
   const first=!S,prev=S||uiDefaults();
+  const prevMine=!first&&prev.me&&d.me&&prev.me.id===d.me.id?Object.fromEntries(prev.projects.filter(x=>x.ownerId===d.me.id).map(x=>[x.id,x.status])):null;
+  const prevPts=prevMine?prev.me.pts:0;
   const students=d.students;
   let me=GUEST();
   if(d.me){me=students.find(x=>x.id===d.me.id)||d.me;Object.assign(me,d.me)}
   S={...uiDefaults(),role:prev.role,tab:prev.tab,auth:{...prev.auth,jovem:!!d.me},staff:prev.staff,sp:d.sponsors.some(x=>x.id===prev.sp)?prev.sp:d.sponsors[0].id,
-    filter:prev.filter,rankTab:prev.rankTab,demoOpen:prev.demoOpen,seenBadges:prev.seenBadges,preMission:prev.preMission,
+    filter:prev.filter,rankTab:prev.rankTab,demoOpen:prev.demoOpen,seenBadges:prev.seenBadges,preMission:prev.preMission,pending:prev.pending,
     flags:{scanned:!!(d.me&&d.me.scanned),sponsorSeen:prev.flags.sponsorSeen},
     students,me,sponsors:d.sponsors,missions:d.missions,projects:d.projects,certs:d.certs,invites:d.invites,
     feed:d.feed.map(f=>({...f,t:clock(f.t)})),registered:d.counts.registered,indep:d.counts.indep,
     regionJoin:{...Object.fromEntries(REGS.map(x=>[x,0])),...d.counts.regionJoin},baseJoined:d.counts.baseJoined};
   setUser(me);
   if(first||!d.me)badges().filter(b=>b.ok()).forEach(b=>S.seenBadges.add(b.id));
+  if(prevMine)liveNews(prevMine,prevPts);
+}
+/* novidades que chegaram de outras pessoas enquanto o jovem usava o site */
+function liveNews(prevMine,prevPts){
+  let party=false;
+  S.projects.filter(p=>isMine(p)&&prevMine[p.id]&&prevMine[p.id]!==p.status).forEach(p=>{
+    if(prevMine[p.id]==='avaliacao'&&p.score!=null)toast(`A banca avaliou “${p.title}”: nota ${p.score}!`,'good');
+    if(p.status==='aprovado'){toast(`“${p.title}” foi selecionado para ir ao ar na NSC TV!`,'good');party=true}
+  });
+  if(S.me.pts>prevPts&&S.role==='jovem')celebrate(S.me.pts-prevPts,prevPts);
+  if(party&&S.role==='jovem')confetti();
+  checkBadges();
 }
 /* grava uma ação no banco; se der erro, avisa e volta ao que está salvo */
 function sync(path,data){
@@ -148,7 +163,7 @@ function spStats(id){
   const invites=(S.invites[id]||[]).length;
   return{ms,engaged,delivered,quota,projs,aired,sponsored,allowed,hasReport,invites,
     cost:engaged?quota/engaged:quota,reach:engaged*4+aired*18000+sponsored*6000,
-    top:[...projs].filter(p=>p.status!=='recusado').sort((a,b)=>b.score-a.score).slice(0,3)};
+    top:[...projs].filter(p=>p.score!=null&&p.status!=='recusado').sort((a,b)=>b.score-a.score).slice(0,3)};
 }
 function recs(){
   const me=S.me;
@@ -180,8 +195,7 @@ async function submitProject(f){
     const r=await API.post('/api/projects',{action:'submit',studentId:S.me.id,missionId:m.id,title:f.title,description:f.desc,link:f.link||('Arquivo: '+f.file)});
     await refresh();S.fresh[r.certId]=1;celebrate(r.awarded,before);
   }else{
-    const sc=genScores(84+Math.random()*8,Math.random);
-    const p={id:'p'+(S.pid++),title:f.title,desc:f.desc,owner:S.me.name,school:S.me.school,city:S.me.city,mission:m.id,status:'pendente',sp:null,scores:sc,score:total(sc),ownerId:S.me.id,link:f.link||f.file};
+    const p={id:'p'+(S.pid++),title:f.title,desc:f.desc,owner:S.me.name,school:S.me.school,city:S.me.city,mission:m.id,status:'avaliacao',sp:null,scores:null,score:null,ownerId:S.me.id,link:f.link||f.file};
     S.projects.unshift(p);
     m.me.delivered=true;m.delivered++;
     addXP(m.pts);
@@ -189,9 +203,19 @@ async function submitProject(f){
     const c={id:'c'+(S.cid++),owner:S.me.name,school:S.me.school,city:S.me.city,title:`${m.area} aplicado: ${m.title}`,area:m.area,status:'pendente',ownerId:S.me.id};
     S.certs.unshift(c);S.fresh[c.id]=1;
     addFeed(`${pub(S.me.name)} entregou “${p.title}” no desafio “${m.title}”.`,m.sp);
+  }
+  confetti();checkBadges();toast('Projeto enviado! Agora a banca técnica vai avaliar.','good');
+}
+async function gradeProject(pid,scores){
+  const p=S.projects.find(x=>x.id===pid);
+  if(API.online){await API.post('/api/projects',{action:'grade',id:pid,scores});await refresh()}
+  else{
+    if(p.status!=='avaliacao')throw new Error('Este projeto já foi avaliado.');
+    p.scores=scores;p.score=total(scores);p.status='pendente';
     addFeed(`A banca técnica avaliou “${p.title}”: nota ${p.score}. Projeto na fila do quadro.`,'*');
   }
-  confetti();checkBadges();toast('Projeto enviado e avaliado pela banca. Veja a nota no seu portfólio.','good');
+  const q=S.projects.find(x=>x.id===pid);
+  toast(`Notas enviadas: ${q&&q.score!=null?q.score:''}. O projeto foi para a fila do quadro.`,'good');
 }
 function approve(pid,ok){
   const p=S.projects.find(x=>x.id===pid);if(p.status!=='pendente')return;
@@ -263,15 +287,7 @@ const lockIco='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" wi
 function critList(sc,key){
   return`<div class="stack">${CRIT.map(([k,l,w])=>`<div class="crit"><span>${l}${sc?` <small>peso ${w}</small>`:''}</span><b>${sc?sc[k]:w+'%'}</b>${sc?bar(key+k,sc[k]):`<div class="bar"><i style="width:${w*3.3}%"></i></div>`}</div>`).join('')}</div>`;
 }
-function qr(){
-  const r=rng(7),n=21;let out='';
-  const finder=(x,y)=>`<rect x="${x}" y="${y}" width="7" height="7" fill="#0C111E"/><rect x="${x+1}" y="${y+1}" width="5" height="5" fill="#fff"/><rect x="${x+2}" y="${y+2}" width="3" height="3" fill="#0C111E"/>`;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-    if((x<8&&y<8)||(x>n-9&&y<8)||(x<8&&y>n-9))continue;
-    if(r()>.5)out+=`<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="#0C111E"/>`;
-  }
-  return`<svg viewBox="0 0 21 21" shape-rendering="crispEdges" role="img" aria-label="QR code de exemplo">${out}${finder(0,0)}${finder(n-7,0)}${finder(0,n-7)}</svg>`;
-}
+function qr(mid=FEATURED){return qrSvg(deepLink(mid),'QR code que abre o desafio da semana no celular')}
 function mCard(m){
   const sp=sponsor(m.sp),t=PLAN[m.plan],pct=m.joined/t.slots*100;
   const st=m.me.delivered?stChip('Entregue','st-ok'):m.me.joined?stChip('Em andamento','st-wait'):'';
@@ -350,11 +366,12 @@ function vSobre(){
 
   <section class="band rv">
     <div>${tvScreen('Aponte a câmera e entre no desafio da semana.','Desafio Troco solidário · Litoral Pay')}
-      <p class="screen-cap">Exemplo do QR code no ar durante o programa.</p></div>
+      <p class="screen-cap">Este QR funciona: aponte a câmera do celular e entre no desafio da semana.</p></div>
     <div>
       <h2>A TV chama o público. O site é onde a experiência acontece.</h2>
       <p>Durante o programa, um QR code leva quem está assistindo direto ao desafio da semana. Quem participa ganha pontos na hora, e os melhores projetos voltam para a tela.</p>
       <div class="roles2"><span>TV: amplifica e divulga os resultados</span><span>Site: o motor da experiência</span></div>
+      <a class="btn" href="tv.html" target="_blank" rel="noopener" style="margin-top:20px">Abrir o telão ao vivo</a>
     </div>
   </section>
 
@@ -490,7 +507,7 @@ function vJovemPortfolio(){
   </section>
   <section class="card"><div class="head"><h2>Projetos</h2></div><div class="stack">
     ${projs.map(p=>`<div class="cert"><div style="flex:1;min-width:180px"><b>${esc(p.title)}</b><br><small>${esc(mission(p.mission).title)} · ${esc(sponsor(mission(p.mission).sp).name)}</small></div>
-      <div class="row">${p.status==='aprovado'?stChip('No ar no Tech SC Jovem','st-tv'):p.status==='recusado'?stChip('Não selecionado para a TV','st-no'):stChip('Na fila do quadro','st-wait')}${p.sp?stChip('Padrinho: '+esc(sponsor(p.sp).name),'st-ok'):''}<button class="btn ghost sm" data-act="openEval" data-id="${p.id}">Nota ${p.score} · ver avaliação</button></div></div>`).join('')||'<div class="empty">Seus projetos aparecem aqui depois do envio.<br><br><button class="btn sm" data-act="tab" data-id="desafios">Escolher um desafio</button></div>'}
+      <div class="row">${p.status==='avaliacao'?stChip('Aguardando a banca técnica','st-wait'):p.status==='aprovado'?stChip('No ar no Tech SC Jovem','st-tv'):p.status==='recusado'?stChip('Não selecionado para a TV','st-no'):stChip('Na fila do quadro','st-wait')}${p.sp?stChip('Padrinho: '+esc(sponsor(p.sp).name),'st-ok'):''}${p.score!=null?`<button class="btn ghost sm" data-act="openEval" data-id="${p.id}">Nota ${p.score} · ver avaliação</button>`:''}</div></div>`).join('')||'<div class="empty">Seus projetos aparecem aqui depois do envio.<br><br><button class="btn sm" data-act="tab" data-id="desafios">Escolher um desafio</button></div>'}
   </div></section>
   <div class="grid">
   <section class="card"><div class="head"><h2>Certificados</h2></div><div class="stack">
@@ -576,7 +593,7 @@ function vPatroCriar(){
 }
 function vPatroTalentos(){
   const st=spStats(S.sp),inv=S.invites[S.sp]||[];
-  const list=S.projects.filter(p=>p.status!=='recusado').sort((a,b)=>b.score-a.score);
+  const list=S.projects.filter(p=>p.score!=null&&p.status!=='recusado').sort((a,b)=>b.score-a.score);
   return`  <div class="grid">${list.map(p=>{const m=mission(p.mission),priv=isMine(p)&&!S.me.showPortfolio;return`<article class="card stack">
     <div class="row">${chipArea(m.area)}${p.status==='aprovado'?stChip('No ar','st-tv'):stChip('Na fila do quadro','st-wait')}${isMine(p)?stChip('Novo','st-ok'):''}<span class="spacer"></span><b class="num" style="font-size:20px">${p.score}</b></div>
     <h3>${esc(p.title)}</h3><p class="mute">${esc(p.desc)}</p><small>${esc(pub(p.owner))} · ${esc(placeOf(p))} · desafio ${esc(m.title)}</small>
@@ -601,7 +618,7 @@ function vProgMetricas(){
     ${kpi('Desafios ativos',S.missions.length,'n','de '+sps+' empresas','p4')}
     ${kpi('Receita dos planos',rev,'brl','valores fictícios','p5')}
     ${kpi('Empresas',sps,'n','com desafios no ar','p6')}
-    ${kpi('Na fila do quadro',fila,'n','avaliados pela banca','p7')}
+    ${kpi('Na fila do quadro',fila,'n',S.projects.filter(p=>p.status==='avaliacao').length+' esperando a banca','p7')}
     ${kpi('No ar',ar,'n','projetos no Tech SC Jovem','p8')}
   </div>
   <div class="grid">
@@ -617,6 +634,22 @@ function vProgMetricas(){
     ${S.sponsors.map(s=>{const st=spStats(s.id);return`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.city)}</td><td>${st.ms.length}</td><td>${brl(st.quota)}</td><td>${nf(st.engaged)}</td></tr>`}).join('')}
   </tbody></table></div></section>
   <section class="card"><div class="head"><h2>Atividade da plataforma</h2></div><ul class="feed">${S.feed.map(e=>`<li><time>${e.t}</time><span>${esc(e.msg)}</span></li>`).join('')}</ul></section>`;
+}
+function vProgBanca(){
+  const q=S.projects.filter(p=>p.status==='avaliacao');
+  const done=S.projects.filter(p=>p.score!=null).length;
+  const card=p=>{const m=mission(p.mission),sp=sponsor(m.sp);
+    const link=/^https?:\/\//.test(p.link||'')?`<a href="${esc(p.link)}" target="_blank" rel="noopener noreferrer">Abrir o projeto</a>`:p.link?`<small>${esc(p.link)}</small>`:'';
+    return`<article class="card grade-card"><form data-form="grade" data-id="${p.id}" novalidate>
+      <div class="row">${chipArea(m.area)}<span class="chip">Desafio: ${esc(m.title)}</span><span class="chip">${esc(sp.name)}</span></div>
+      <div><h3 style="font-size:19px">${esc(p.title)}</h3><p class="mute" style="margin-top:6px">${esc(p.desc)}</p>${link?`<p style="margin-top:8px">${link}</p>`:''}</div>
+      <div class="stack" style="gap:14px">${CRIT.map(([k,l,w])=>`<label class="gr"><span class="gr-top"><b>${l}</b><small>peso ${w}</small><output data-out="${k}">75</output></span><small>${CRIT_HINT[k]}</small><input type="range" name="${k}" min="0" max="100" step="5" value="75" aria-label="${l}"></label>`).join('')}</div>
+      <div class="total"><span>Nota final (média ponderada)</span><span class="num gt">75</span></div>
+      <p class="err" role="alert"></p>
+      <button class="btn" type="submit">Enviar notas</button>
+    </form></article>`};
+  return`<div class="lock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg><span>A empresa que lançou o desafio não participa da avaliação. Depois das notas, o projeto vai para a fila do quadro, onde a equipe da NSC TV escolhe quem vai ao ar. ${done} projetos já avaliados.</span></div>
+  <div class="grid" style="align-items:start">${q.map(card).join('')||'<div class="empty">Nenhum projeto esperando avaliação. Quando um jovem entregar, ele aparece aqui.</div>'}</div>`;
 }
 function vProgFila(){
   const q=S.projects.filter(p=>p.status==='pendente').sort((a,b)=>b.score-a.score),ar=S.projects.filter(p=>p.status==='aprovado');
@@ -645,7 +678,7 @@ function pageHead(){
   let T='',D='',X='';
   if(!a){
     T={jovem:'Entrar como jovem',patro:'Entrar como empresa',prog:'Equipe do programa'}[r];
-    D={jovem:'Com ou sem escola parceira, de qualquer cidade de Santa Catarina.',patro:'Lance desafios, apadrinhe projetos e acompanhe o retorno em números.',prog:'Curadoria do quadro na NSC TV e validação de certificados pela JA SC.'}[r];
+    D={jovem:'Com ou sem escola parceira, de qualquer cidade de Santa Catarina.',patro:'Lance desafios, apadrinhe projetos e acompanhe o retorno em números.',prog:'Banca técnica, curadoria do quadro na NSC TV e validação de certificados pela JA SC.'}[r];
   }else if(r==='jovem'){
     const first=S.me.name.split(' ')[0],lv=level(S.me.pts);
     ({inicio:()=>{T='Olá, '+first;D=`Nível ${lv.i} (${lv.name}). Seu desafio da semana, seu progresso e onde você está no ranking.`},
@@ -659,10 +692,13 @@ function pageHead(){
       talentos:()=>{T='Talentos';D='Apadrinhar coloca sua marca ao lado do projeto no quadro e garante mentoria da sua equipe. Os jovens aparecem com nome abreviado e contatos pessoais não são compartilhados.';X=stChip(st.sponsored+' de '+st.allowed+' apadrinhamentos','st-pc')}})[t]();
   }else{
     const q=S.projects.filter(p=>p.status==='pendente').length,pend=S.certs.filter(c=>c.status==='pendente').length;
-    ({metricas:()=>{T='Visão geral de Santa Catarina';D='Jovens das 6 regiões do estado, com ou sem vínculo com escola. Todos os números são de exemplo.'},
+    const ag=S.projects.filter(p=>p.status==='avaliacao').length;
+    ({banca:()=>{T='Banca técnica';D='Avaliação às cegas: você vê o projeto e o desafio, mas não o nome, a escola nem a cidade de quem fez. Os critérios e pesos são os mesmos para todos.';X=stChip(ag+' para avaliar','st-wait')},
+      metricas:()=>{T='Visão geral de Santa Catarina';D='Jovens das 6 regiões do estado, com ou sem vínculo com escola. Todos os números são de exemplo.'},
       fila:()=>{T='Quadro Tech SC Jovem';D='Projetos já avaliados pela banca técnica, em ordem de nota. Escolha quais vão ao ar. A empresa patrocinadora não influencia a nota nem a seleção.';X=stChip(q+' na fila','st-wait')},
       cert:()=>{T='Validação de certificados';D=`A Junior Achievement SC confere cada entrega e valida o certificado, que passa a constar no portfólio. Já são ${186+S.certs.filter(c=>c.status==='validado').length} validados no estado (exemplo).`;X=stChip(pend+' pendentes','st-wait')}})[t]();
   }
+  if(r==='prog'&&a)X+='<a class="btn sm" href="tv.html" target="_blank" rel="noopener">Abrir telão</a>';
   const acts=X+(S.demoOpen?'':'<button class="btn ghost sm mob-only" data-act="demoOpen">Demonstração guiada</button>')+(a?'<button class="btn ghost sm" data-act="logout">Sair</button>':'');
   return`<div><h1>${esc(T)}</h1><p>${esc(D)}</p></div><div class="acts">${acts}</div>`;
 }
@@ -676,7 +712,8 @@ function vLogin(){
   const note=API.online?'<p class="notice">Seus dados ficam salvos no banco do Tech SC Hub.</p>':'<p class="notice">Modo demonstração: nada é salvo fora desta página.</p>';
   if(S.role==='jovem'){
     const years=[];for(let y=YEAR-14;y>=YEAR-24;y--)years.push(y);
-    return`<div class="grid" style="align-items:start">
+    const pm=S.pending&&mission(S.pending.mission);
+    return`${pm?`<div class="qr-arrive"><span class="live">VEIO DA TV</span><span>Entre ou crie sua conta para participar do desafio <b>${esc(pm.title)}</b>${S.pending.tv?' e ganhar +10 XP de segunda tela':''}.</span></div>`:''}<div class="grid" style="align-items:start">
     <section class="card lead"><div class="head"><h2>Entrar no Tech SC Hub</h2>${stChip('Com ou sem escola','st-pc')}</div>
     <p style="margin-bottom:14px">Desafios de tecnologia de empresas catarinenses para jovens de qualquer cidade de Santa Catarina. Estudar em uma escola parceira é opcional.</p>
     <button class="btn wide" data-act="demoJovem">Entrar com a conta de exemplo (Camila, São José)</button>
@@ -721,7 +758,7 @@ function vLogin(){
     <p class="mute" style="margin-bottom:14px">Para a equipe da NSC TV, que faz a curadoria do quadro, e da Junior Achievement SC, que valida os certificados.</p>
     <form data-form="loginProg" novalidate>
       <label class="f">Seu nome<input type="text" id="lp-name" name="name" maxlength="60" value="Equipe Tech SC"></label>
-      <label class="f">Organização<select id="lp-org" name="org"><option>NSC TV</option><option>Junior Achievement SC</option></select></label>
+      <label class="f">Organização<select id="lp-org" name="org"><option>NSC TV</option><option>Banca técnica</option><option>Junior Achievement SC</option></select></label>
       <button class="btn" type="submit">Entrar</button>${note}
     </form></section>`;
 }
@@ -734,7 +771,8 @@ function demoSteps(){
     {t:'Entre como jovem com a conta de exemplo',done:S.auth.jovem,go:J},
     {t:'Leia o QR que aparece no programa de TV',done:S.flags.scanned,async go(){await J();S.tab.jovem='inicio'}},
     {t:'Entre no desafio da Litoral Pay',done:m1.me.joined,async go(){await J();S.tab.jovem='inicio';S.sheet={type:'mission',id:'m1'}}},
-    {t:'Envie seu projeto e veja a nota da banca',done:m1.me.delivered,async go(){await J();S.tab.jovem='enviar';S.preMission='m1'}},
+    {t:'Envie seu projeto para a banca',done:m1.me.delivered,async go(){await J();S.tab.jovem='enviar';S.preMission='m1'}},
+    {t:'Avalie o projeto como banca técnica (às cegas)',done:!!(mine&&mine.status!=='avaliacao'),go(){S.role='prog';S.auth.prog=true;S.tab.prog='banca'}},
     {t:'Veja o retorno no painel da empresa',done:S.flags.sponsorSeen,go(){S.role='patro';S.auth.patro=true;S.sp='litoralpay';S.tab.patro='painel'}},
     {t:'Selecione o projeto para ir ao ar',done:!!(mine&&mine.status==='aprovado'),go(){S.role='prog';S.auth.prog=true;S.tab.prog='fila'}}
   ];
@@ -753,7 +791,15 @@ function vDemo(){
 }
 
 /* ============ renderização ============ */
+/* chegou pelo QR da TV: abre o desafio e conta a "segunda tela" (+10 XP, uma vez) */
+function consumePending(){
+  const p=S.pending;S.pending=null;
+  const m=mission(p.mission);S.role='jovem';S.tab.jovem='inicio';
+  if(p.tv&&!S.flags.scanned){S.flags.scanned=true;addXP(10);checkBadges();quiet(sync('/api/students',{action:'scan',id:S.me.id}));toast('Você chegou pela TV: +10 XP de segunda tela!','good')}
+  if(m)S.sheet={type:'mission',id:m.id};
+}
 function render(){
+  if(S.pending&&S.auth.jovem)consumePending();
   const app=$('#app');app.dataset.role=S.role;
   const t=S.tab[S.role],authed=S.auth[S.role],nav=NAV[S.role];
   const showNav=authed&&nav.length>0;
@@ -764,7 +810,7 @@ function render(){
   const ph=pageHead();$('#phead').innerHTML=ph;$('#phead').hidden=!ph;
   $('#tabs').hidden=!showNav;$('.main').style.paddingBottom=showNav?'':'48px';
   $('#tabs').innerHTML=showNav?navBtns(false):'';
-  const V={sobre:{'':vSobre},jovem:{inicio:vJovemInicio,desafios:vJovemDesafios,portfolio:vJovemPortfolio,enviar:vJovemEnviar},patro:{painel:vPatroPainel,criar:vPatroCriar,talentos:vPatroTalentos},prog:{metricas:vProgMetricas,fila:vProgFila,cert:vProgCert}};
+  const V={sobre:{'':vSobre},jovem:{inicio:vJovemInicio,desafios:vJovemDesafios,portfolio:vJovemPortfolio,enviar:vJovemEnviar},patro:{painel:vPatroPainel,criar:vPatroCriar,talentos:vPatroTalentos},prog:{metricas:vProgMetricas,banca:vProgBanca,fila:vProgFila,cert:vProgCert}};
   $('#view').innerHTML=authed?V[S.role][t]():vLogin();
   $('#sheetHost').innerHTML=S.sheet?vSheet():'';
   let sc=$('#scanHost');if(S.scanning){if(!sc){sc=document.createElement('div');sc.id='scanHost';sc.className='scan';sc.innerHTML='<div><div class="frame"></div><p>Lendo o QR do programa…</p></div>';document.body.appendChild(sc)}}else if(sc)sc.remove();
@@ -819,7 +865,7 @@ document.addEventListener('click',e=>{
   const id=el.dataset.id,act=el.dataset.act;
   switch(act){
     case'theme':{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';return}
-    case'role':S.role=id;S.sheet=null;if(API.online)quiet(refresh().then(render));break;
+    case'role':S.role=id;S.sheet=null;liveRefresh();break;
     case'go':S.role=el.dataset.role;S.sheet=null;break;
     case'startDemo':S.demoOpen=true;S.role='jovem';break;
     case'logout':S.auth[S.role]=false;S.sheet=null;if(S.role==='jovem'&&API.online){API.studentId='';quiet(refresh().then(render))}break;
@@ -857,6 +903,12 @@ document.addEventListener('click',e=>{
   if(['role','go','startDemo','tab','toSubmit','demoGo','demoJovem','loginSp','logout','reset'].includes(act))window.scrollTo({top:0});
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.sheet){S.sheet=null;render()}});
+document.addEventListener('input',e=>{
+  const f=e.target.closest('form[data-form=grade]');if(!f||e.target.type!=='range')return;
+  const sc={};CRIT.forEach(([k])=>{sc[k]=+f.elements[k].value});
+  f.querySelector(`[data-out="${e.target.name}"]`).textContent=e.target.value;
+  f.querySelector('.gt').textContent=total(sc);
+});
 document.addEventListener('change',e=>{
   if(e.target.id==='rg-school'){
     const i=+e.target.value,has=i>=0;
@@ -911,7 +963,11 @@ async function submitForm(form){
     else{const sp={id:'s'+(S.sid++),name:fd.name.trim(),city:fd.city.trim(),sector:fd.sector};S.sponsors.push(sp);S.sp=sp.id;addFeed(`${sp.name} (${sp.city}) entrou na plataforma.`,'*')}
     S.auth.patro=true;S.tab.patro='criar';toast('Empresa cadastrada. Lance seu primeiro desafio.','good');
   }
-  if(k==='loginProg'){S.staff={name:fd.name.trim()||'Equipe Tech SC',org:fd.org};S.auth.prog=true;S.tab.prog=fd.org==='NSC TV'?'fila':'cert'}
+  if(k==='grade'){
+    const sc={};CRIT.forEach(([c])=>{sc[c]=+fd[c]});
+    await gradeProject(form.dataset.id,sc);
+  }
+  if(k==='loginProg'){S.staff={name:fd.name.trim()||'Equipe Tech SC',org:fd.org};S.auth.prog=true;S.tab.prog={'NSC TV':'fila','Banca técnica':'banca'}[fd.org]||'cert'}
   if(k==='project'){
     const file=form.querySelector('#pj-file').files[0];
     if(!fd.title.trim()||!fd.desc.trim())return stop('#pj-err','Preencha o título e a descrição.');
@@ -925,6 +981,16 @@ async function submitForm(form){
     S.tab.patro='painel';
   }
 }
+/* atualização automática: a cada 8 s, nas telas que só mostram dados */
+const LIVE_TABS={jovem:['inicio','desafios','portfolio'],patro:['painel','talentos'],prog:['metricas','fila','cert']};
+const canLive=()=>API.online&&!document.hidden&&S&&!S.sheet&&!S.scanning&&S.auth[S.role]&&(LIVE_TABS[S.role]||[]).includes(S.tab[S.role])&&!document.querySelector('#view form');
+/* busca novidades e só redesenha se ainda for seguro (ninguém preenchendo nada) */
+function liveRefresh(){
+  if(!canLive())return;
+  refresh().then(()=>{if(canLive()||!document.querySelector('#view form'))render()}).catch(()=>{});
+}
+setInterval(liveRefresh,8000);
+
 /* executa uma ação assíncrona e redesenha a tela no fim */
 function run(promise){
   promise.then(render).catch(e=>{toast(e.message||'Algo deu errado.','warn');render()});
@@ -933,10 +999,13 @@ function run(promise){
 /* ============ início ============ */
 if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&'IntersectionObserver' in window)document.documentElement.classList.add('js');
 (async()=>{
+  const qs=new URLSearchParams(location.search),deep=qs.get('desafio');
+  if(deep){history.replaceState(null,'',location.pathname)}
   if(await API.check()){
     try{await refresh()}
     catch(e){API.online=false;toast('Não foi possível carregar o banco. Usando o modo demonstração.','warn')}
   }
   if(!S)init();
+  if(deep){S.pending={mission:deep,tv:qs.has('tv')};S.role='jovem'}
   render();
 })();

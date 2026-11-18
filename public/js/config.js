@@ -61,6 +61,8 @@ const CRIT=[
   ['criatividade','Criatividade e originalidade',20],
   ['impacto','Viabilidade e impacto',15],
   ['clareza','Clareza da apresentação',10]];
+/* o que a banca observa em cada critério */
+const CRIT_HINT={problema:'Atende ao que a empresa pediu no desafio?',tecnica:'Funciona? Está bem construído e testado?',criatividade:'Traz uma ideia nova ou um jeito diferente de resolver?',impacto:'Daria para usar de verdade? Ajuda pessoas?',clareza:'É fácil entender o que foi feito e como usar?'};
 const total=sc=>Math.round(CRIT.reduce((a,[k,,w])=>a+sc[k]*w,0)/100);
 function genScores(target,r){const o={};CRIT.forEach(([k])=>{o[k]=Math.max(40,Math.min(100,Math.round(target+(r()-.5)*18)))});return o}
 
@@ -72,14 +74,33 @@ const ICON={
   painel:'<path d="M5 20V11M12 20V4M19 20v-6"/>',criar:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
   talentos:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"/>',
   metricas:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  banca:'<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/>',
   fila:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 3l4 3 4-3"/>',cert:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'
 };
 const NAV={
   sobre:[],
   jovem:[['inicio','Início'],['desafios','Desafios'],['portfolio','Portfólio'],['enviar','Enviar']],
   patro:[['painel','Painel'],['criar','Criar desafio'],['talentos','Talentos']],
-  prog:[['metricas','Métricas'],['fila','Quadro na TV'],['cert','Certificados']]
+  prog:[['metricas','Métricas'],['banca','Avaliar'],['fila','Quadro na TV'],['cert','Certificados']]
 };
 const ROLES=[['sobre','Conheça'],['jovem','Jovem'],['patro','Empresa'],['prog','Programa']];
 const RI={sobre:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',jovem:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>',patro:'<path d="M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16M16 9h2a2 2 0 012 2v10M8 7h4M8 11h4M8 15h4M2 21h20"/>',prog:'<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/>'};
 const ARROW='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+/* ============ QR code e link direto ============ */
+const FEATURED='m1'; /* desafio da semana (aparece na TV e no QR) */
+/* endereço do site: o publicado na Vercel ou o local */
+function siteBase(){
+  if(location.protocol==='http:'||location.protocol==='https:')return location.origin+'/';
+  return 'https://tech-sc-hub.vercel.app/';
+}
+/* link que o QR abre: entra direto no desafio e conta como "segunda tela" */
+const deepLink=(mid=FEATURED)=>`${siteBase()}?desafio=${encodeURIComponent(mid)}&tv=1`;
+/* QR code de verdade, desenhado em SVG (usa js/vendor/qrcode.js) */
+function qrSvg(text,label='QR code'){
+  if(typeof qrcode!=='function')return'';
+  const q=qrcode(0,'M');q.addData(text);q.make();
+  const n=q.getModuleCount(),m=2;let d='';
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(q.isDark(y,x))d+=`M${x+m} ${y+m}h1v1h-1z`;
+  return`<svg viewBox="0 0 ${n+m*2} ${n+m*2}" shape-rendering="crispEdges" role="img" aria-label="${esc(label)}"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#0C111E"/></svg>`;
+}

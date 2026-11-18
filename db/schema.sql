@@ -79,10 +79,12 @@ create table projects (
   title        text not null,
   description  text not null,
   link         text,
-  status       text not null default 'pendente' check (status in ('pendente','aprovado','recusado')),
+  -- avaliacao = esperando a banca · pendente = na fila do quadro · aprovado = no ar · recusado
+  status       text not null default 'avaliacao' check (status in ('avaliacao','pendente','aprovado','recusado')),
   sponsor_id   text references sponsors(id),       -- empresa que apadrinhou
-  scores       jsonb not null,
-  score        int not null,
+  scores       jsonb,                              -- notas da banca por critério (vazio até avaliar)
+  score        int,                                -- média ponderada
+  graded_at    timestamptz,
   created_at   timestamptz not null default now()
 );
 
