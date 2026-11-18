@@ -1,0 +1,17 @@
+{
+  "name": "tech-sc-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma gamificada de desafios reais que conecta jovens catarinenses a empresas, com o quadro Tech SC Jovem na NSC TV.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "db:setup": "node --env-file=.env scripts/setup-db.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.1"
+  }
+}
